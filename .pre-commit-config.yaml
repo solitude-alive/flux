@@ -1,0 +1,55 @@
+# Exclude specific directories from checks (e.g., build artifacts, virtual envs)
+exclude: 'build|dist|.git|zsh/.p10k.zsh'
+
+default_language_version:
+  python: python3
+
+repos:
+  # ------------------------------------------------------------------
+  # 1. Basic Hygiene & Security
+  # ------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: '^(.*\.svg)$'
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable # Ensure any file with a shebang (#!) is marked as executable (+x)
+      - id: check-executables-have-shebangs # Ensure scripts have a shebang (e.g., #!/bin/bash)
+      - id: check-added-large-files
+        args: ['--maxkb=5000'] # Prevent committing files larger than 5MB
+      - id: detect-private-key # [Critical] Detect and prevent committing SSH private keys
+      - id: no-commit-to-branch # Prevent committing directly to main branch
+        args: [ '--branch', 'main' ]
+
+  # ------------------------------------------------------------------
+  # 2. Shell Scripting Tools
+  # ------------------------------------------------------------------
+  # Static Analysis: Checks for logic errors (e.g., unquoted variables)
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Auto-formatting: Standardize shell script style
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.12.0-2
+    hooks:
+      - id: shfmt
+        args: ["-w", "-i", "2"] # Write changes to file (-w), indent with 2 spaces (-i 2)
+
+  # ------------------------------------------------------------------
+  # 3. Python Tools
+  # ------------------------------------------------------------------
+  # Linting: Ruff (Replaces Flake8)
+  # Chosen for speed and minimal dependencies in a dotfiles context.
+  # Covers flake8, isort, pyupgrade, etc.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format

@@ -1,0 +1,52 @@
+# =============================================================================
+# Project Configuration Template (pyproject.toml)
+# =============================================================================
+
+# --- Project Metadata (PEP 621) ---
+[project]
+name = "flux"
+version = "0.0.01"
+description = "Personal py library."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests",
+]
+
+# --- Tool Configuration: Ruff ---
+# Note: In pyproject.toml, ruff config must be under [tool.ruff]
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+# Rules: Pyflakes(F), PEP8(E/W), Imports(I), Bugs(B), Upgrade(UP), Naming(N)
+select = ["F", "E", "W", "I", "B", "UP", "N"]
+ignore = ["E501"] # Ignore line length errors
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# --- Tool Configuration: Pytest ---
+[tool.pytest.ini_options]
+minversion = "6.0"
+# -ra: show extra test summary info
+# -q: quiet mode
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+# --- Tool Configuration: Pyright (Type Checker) ---
+[tool.pyright]
+# include = ["src"]  # only for library projects
+include = ["."]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.git",
+    "**/venv",
+    "**/.venv"
+]
+
+reportMissingImports = true
+reportMissingTypeStubs = false
