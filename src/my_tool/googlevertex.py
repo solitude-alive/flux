@@ -17,6 +17,7 @@ class GoogleVertexLLM:
         *,
         api_key: str | None = None,
         project: str | None = None,
+        vertexai: bool = False,
         location: str | None = None,
         system_instruction: str | None = None,
         temperature: float | None = None,
@@ -33,6 +34,7 @@ class GoogleVertexLLM:
         client_kwargs: dict[str, Any] = {}
         if api_key:
             client_kwargs["api_key"] = api_key
+            client_kwargs["vertexai"] = vertexai
         elif project and location:
             client_kwargs["vertexai"] = True
             client_kwargs["project"] = project
@@ -131,6 +133,7 @@ if __name__ == "__main__":
     llm = GoogleVertexLLM(
         api_key=os.getenv("VERTEX_API_KEY"),
         model=os.getenv("GCP_MODEL", "gemini-2.5-flash-lite"),
+        vertexai=True,
     )
     print(llm)
     print(llm("Hello, how are you?"))
