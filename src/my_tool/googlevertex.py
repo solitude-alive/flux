@@ -149,9 +149,10 @@ if __name__ == "__main__":
     # --- Vertex API Example ---
     print("--- Vertex API Example ---")
     vertex_client = GoogleVertexLLM(
-        project=os.getenv("GCP_PROJECT_ID"),
         api_key=os.getenv("VERTEX_API_KEY"),
+        project=os.getenv("GCP_PROJECT_ID"),
         location="us-central1",
+        model="gemini-2.5-flash-lite",
     )
 
     print(vertex_client("Hello, how are you?"))
