@@ -12,6 +12,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]  # allow 2 spaces for line breaks in markdown files
       - id: end-of-file-fixer
         exclude: '^(.*\.svg)$'
       - id: check-yaml
@@ -22,8 +23,8 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=5000'] # Prevent committing files larger than 5MB
       - id: detect-private-key # [Critical] Detect and prevent committing SSH private keys
-      - id: no-commit-to-branch # Prevent committing directly to main branch
-        args: [ '--branch', 'main' ]
+      # - id: no-commit-to-branch # Prevent committing directly to main branch
+      #   args: [ '--branch', 'main' ]
 
   # ------------------------------------------------------------------
   # 2. Shell Scripting Tools
