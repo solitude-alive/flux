@@ -100,7 +100,6 @@ class GoogleVertexLLM:
                 yield chunk.text
 
     # ── Convenience ──
-
     def __call__(self, prompt: str, **kwargs: Any) -> str:
         """Shorthand: ``llm("Hello")`` is equivalent to ``llm.generate("Hello")``."""
         return self.generate(prompt, **kwargs)
