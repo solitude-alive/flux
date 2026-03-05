@@ -24,10 +24,16 @@ class GoogleVertexLLM:
         top_p: float | None = None,
         top_k: int | None = None,
     ) -> None:
+        if api_key and (project or location):
+            raise ValueError(
+                "api_key and project/location are mutually exclusive. "
+                "Use api_key for Gemini API, or project/location for Vertex AI."
+            )
+
         client_kwargs: dict[str, Any] = {}
         if api_key:
             client_kwargs["api_key"] = api_key
-        if project and location:
+        elif project and location:
             client_kwargs["vertexai"] = True
             client_kwargs["project"] = project
             client_kwargs["location"] = location
@@ -116,43 +122,39 @@ if __name__ == "__main__":
     python -m src.my_tool.googlevertex
     ```
     """
+    from dotenv import load_dotenv
 
-    # --- Simple Example ---
-    print("--- Simple Example ---")
-    llm = GoogleVertexLLM()
-    response = llm("Hello, how are you?")
-    print(response)
+    load_dotenv(".env")
+
+    # --- Gemini API Example (api_key only) ---
+    print("--- Gemini API Example ---")
+    llm = GoogleVertexLLM(
+        api_key=os.getenv("VERTEX_API_KEY"),
+        model=os.getenv("GCP_MODEL", "gemini-2.5-flash-lite"),
+    )
+    print(llm)
+    print(llm("Hello, how are you?"))
 
     # --- Chat Example ---
-    print("--- Chat Example ---")
+    print("\n--- Chat Example ---")
     messages = [
         {"role": "user", "text": "Hello, how are you?"},
         {"role": "model", "text": "I'm doing great, thank you!"},
+        {"role": "user", "text": "What did I just say?"},
     ]
-    response = llm.chat(messages)
-    print(response)
+    print(llm.chat(messages))
 
     # --- Stream Example ---
-    print("--- Stream Example ---")
-    for chunk in llm.stream("Hello, how are you?"):
+    print("\n--- Stream Example ---")
+    for chunk in llm.stream("Tell me a short joke."):
         print(chunk, end="", flush=True)
     print()
 
-    # --- Gemini API Example ---
-    print("--- Gemini API Example ---")
-    gemini_client = GoogleVertexLLM(
-        model="gemini-2.5-flash-lite",
-        api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    print(gemini_client("Hello, how are you?"))
-
-    # --- Vertex API Example ---
-    print("--- Vertex API Example ---")
-    vertex_client = GoogleVertexLLM(
-        api_key=os.getenv("VERTEX_API_KEY"),
-        project=os.getenv("GCP_PROJECT_ID"),
-        location="us-central1",
-        model="gemini-2.5-flash-lite",
-    )
-
-    print(vertex_client("Hello, how are you?"))
+    # # --- Vertex AI Example (project/location, requires gcloud ADC) ---
+    # print("\n--- Vertex AI Example ---")
+    # vertex_llm = GoogleVertexLLM(
+    #     project=os.getenv("GCP_PROJECT_ID"),
+    #     location=os.getenv("GCP_LOCATION"),
+    # )
+    # print(vertex_llm)
+    # print(vertex_llm("Hello from Vertex AI!"))
