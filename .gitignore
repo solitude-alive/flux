@@ -14,3 +14,6 @@ uv.lock
 
 # ruff
 .ruff_cache/
+
+# runtime log output (e.g. from examples/logger_demo.py)
+log/
