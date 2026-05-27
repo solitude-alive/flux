@@ -24,6 +24,9 @@ from .logger import (
     logkv_mean as log_kv_mean,
 )
 from .logger import (
+    print_config as log_print_config,
+)
+from .logger import (
     warn as log_warn,
 )
 
@@ -37,5 +40,6 @@ __all__ = [
     "log_info",
     "log_kv",
     "log_kv_mean",
+    "log_print_config",
     "log_warn",
 ]

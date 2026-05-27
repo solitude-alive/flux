@@ -629,6 +629,103 @@ def get_dir() -> str | None:
     return get_current().get_dir()
 
 
+def _fmt_bytes(n: int) -> str:
+    if n <= 0:
+        return "disabled"
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if n < 1024 or unit == "TiB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024  # type: ignore[assignment]
+    return str(n)
+
+
+def describe_config() -> dict[str, Any]:
+    """Return the active logger's configuration as a dict (for testing/programmatic use)."""
+    cur = get_current()
+    handlers_info: list[dict[str, Any]] = []
+    for h in cur.output_formats:
+        info_dict: dict[str, Any] = {
+            "type": type(h).__name__,
+            "level": logging.getLevelName(h.level),
+            "formatter": type(h.formatter).__name__ if h.formatter else None,
+        }
+        if isinstance(h, DailySizeRotatingFileHandler):
+            info_dict.update(
+                {
+                    "base_dir": h.base_dir,
+                    "basename": h.basename,
+                    "max_bytes": h.max_bytes,
+                    "backup_count": h.backup_count,
+                    "tz": str(h.tz),
+                    "gzip_old": h.gzip_old,
+                    "retention_days": h.retention_days,
+                    "encoding": h.encoding,
+                    "current_file": h.baseFilename,
+                }
+            )
+        elif isinstance(h, logging.StreamHandler):
+            stream = getattr(h, "stream", None)
+            info_dict["stream"] = getattr(stream, "name", repr(stream))
+        handlers_info.append(info_dict)
+
+    return {
+        "dir": cur.dir,
+        "level": logging.getLevelName(cur.level),
+        "comm": repr(cur.comm) if cur.comm is not None else None,
+        "atexit_registered": _ATEXIT_REGISTERED,
+        "raise_exceptions": logging.raiseExceptions,
+        "num_handlers": len(cur.output_formats),
+        "handlers": handlers_info,
+    }
+
+
+def print_config(file: Any = None) -> None:
+    """Pretty-print the active logger's configuration.
+
+    Useful right after :func:`configure` to verify what's actually in effect.
+
+    Args:
+        file: Optional stream to print to. Defaults to ``sys.stdout``.
+    """
+    out = file if file is not None else sys.stdout
+    cfg = describe_config()
+
+    print("=" * 70, file=out)
+    print("flux.logger configuration", file=out)
+    print("=" * 70, file=out)
+    print(f"  log root         : {cfg['dir']}", file=out)
+    print(f"  global level     : {cfg['level']}", file=out)
+    print(f"  num handlers     : {cfg['num_handlers']}", file=out)
+    print(f"  MPI comm         : {cfg['comm']}", file=out)
+    print(f"  atexit hooked    : {cfg['atexit_registered']}", file=out)
+    print(f"  raiseExceptions  : {cfg['raise_exceptions']}", file=out)
+    print("-" * 70, file=out)
+    for i, h in enumerate(cfg["handlers"]):
+        tag = f"[{i}] {h['type']}"
+        print(f"  {tag}", file=out)
+        print(f"      level        : {h['level']}", file=out)
+        print(f"      formatter    : {h['formatter']}", file=out)
+        if "stream" in h:
+            print(f"      stream       : {h['stream']}", file=out)
+        if "current_file" in h:
+            print(f"      current_file : {h['current_file']}", file=out)
+            print(
+                f"      max_bytes    : {h['max_bytes']} ({_fmt_bytes(h['max_bytes'])})",
+                file=out,
+            )
+            print(f"      backup_count : {h['backup_count']}", file=out)
+            retention_line = (
+                f"      retention    : {h['retention_days']} days"
+                if h["retention_days"]
+                else "      retention    : disabled"
+            )
+            print(retention_line, file=out)
+            print(f"      gzip_old     : {h['gzip_old']}", file=out)
+            print(f"      tz           : {h['tz']}", file=out)
+            print(f"      encoding     : {h['encoding']}", file=out)
+    print("=" * 70, file=out)
+
+
 record_tabular = logkv
 dump_tabular = dumpkvs
 
@@ -715,23 +812,32 @@ def mpi_weighted_mean(
 _ATEXIT_REGISTERED = False
 
 
-def _resolve_log_dir(dir_log: str | None) -> str:
-    """Apply the path-resolution policy locked in by Q&A.
+def _resolve_log_dir(dir_log: str | None, *, root_dir: bool = False) -> str:
+    """Resolve the on-disk log root.
 
-    Order:
+    Selection order for the raw path:
       1. ``dir_log`` argument (if provided).
       2. ``$LOG_DIR`` environment variable.
       3. Default ``"log"``.
 
-    Then, if the path is not absolute, anchor it to ``$STATIC_DIR`` (when
-    set) else ``$CWD``.
+    Anchoring (controlled by ``root_dir``):
+      * ``root_dir=False`` (default): the path is always anchored under
+        ``$STATIC_DIR`` (when set) else ``$CWD``. This means even an
+        explicit ``dir_log`` is treated as a *sub-directory name* unless
+        the caller opts out. (If the supplied path is itself absolute,
+        ``os.path.join`` will naturally discard the anchor, so passing an
+        absolute path also acts as an implicit opt-out.)
+      * ``root_dir=True``: the supplied path is used verbatim (after
+        ``expanduser`` + ``abspath``). Use this when you want to point at
+        a fixed location like ``/var/log/myservice`` and you do NOT want
+        ``$STATIC_DIR`` to apply.
     """
     if dir_log is None:
         dir_log = os.getenv("LOG_DIR")
     if dir_log is None:
         dir_log = "log"
     dir_log = osp.expanduser(dir_log)
-    if not osp.isabs(dir_log):
+    if not root_dir:
         static_dir = os.getenv("STATIC_DIR")
         anchor = static_dir if static_dir else os.getcwd()
         dir_log = osp.join(anchor, dir_log)
@@ -809,6 +915,7 @@ def _build_handler(
 def configure(
     dir_log: str | None = None,
     *,
+    root_dir: bool = False,
     format_strs: Iterable[str] | str | None = None,
     level: int = INFO,
     max_bytes: int = 100 * 1024 * 1024,
@@ -833,7 +940,12 @@ def configure(
     are older than that.
 
     Args:
-        dir_log: Explicit log root (highest precedence).
+        dir_log: Explicit log path (highest precedence). By default this
+            is treated as a *sub-directory name* under ``$STATIC_DIR`` (or
+            ``$CWD`` when unset). Pass ``root_dir=True`` to use it as-is.
+        root_dir: When True, ``dir_log`` is used verbatim and the
+            ``$STATIC_DIR`` anchor is NOT applied. Use this for fixed
+            paths like ``/var/log/myservice``.
         format_strs: Iterable of specs, e.g. ``["stdout", "info", "warn"]``.
             Comma-separated string also accepted. Defaults to
             ``$LOG_FORMAT`` or ``"stdout,info,warn,error"``.
@@ -849,7 +961,7 @@ def configure(
     """
     global _ATEXIT_REGISTERED
 
-    resolved_dir = _resolve_log_dir(dir_log)
+    resolved_dir = _resolve_log_dir(dir_log, root_dir=root_dir)
     os.makedirs(resolved_dir, exist_ok=True)
 
     rank = get_rank_without_mpi_import()
@@ -982,6 +1094,7 @@ __all__ = [
     "Logger",
     "configure",
     "debug",
+    "describe_config",
     "dump_tabular",
     "dumpkvs",
     "error",
@@ -996,6 +1109,7 @@ __all__ = [
     "logkv_mean",
     "logkvs",
     "mpi_weighted_mean",
+    "print_config",
     "profile",
     "profile_kv",
     "record_tabular",
