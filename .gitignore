@@ -11,3 +11,6 @@ __pycache__/
 uv.lock
 
 .env
+
+# ruff
+.ruff_cache/
