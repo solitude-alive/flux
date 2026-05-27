@@ -1,4 +1,5 @@
 import atexit
+import contextlib
 import datetime
 import gzip
 import json
@@ -137,10 +138,8 @@ class DailySizeRotatingFileHandler(logging.handlers.BaseRotatingHandler):
             try:
                 self.stream.flush()
             finally:
-                try:
+                with contextlib.suppress(Exception):
                     self.stream.close()
-                except Exception:
-                    pass
                 # Signal to FileHandler.emit() that the stream needs re-opening
                 # (mirrors stdlib's RotatingFileHandler.doRollover lifecycle).
                 # Routed through __setattr__ so static checkers don't flag it
@@ -171,30 +170,24 @@ class DailySizeRotatingFileHandler(logging.handlers.BaseRotatingHandler):
             for ext in ("", ".gz"):
                 victim = f"{base}{ext}" if ext else base
                 if osp.exists(victim):
-                    try:
+                    with contextlib.suppress(OSError):
                         os.remove(victim)
-                    except OSError:
-                        pass
             return
 
         for i in range(self.backup_count, self.backup_count + 200):
             for ext in ("", ".gz"):
                 victim = f"{base}.{i}{ext}"
                 if osp.exists(victim):
-                    try:
+                    with contextlib.suppress(OSError):
                         os.remove(victim)
-                    except OSError:
-                        pass
 
         for i in range(self.backup_count - 1, 0, -1):
             for ext in ("", ".gz"):
                 src = f"{base}.{i}{ext}"
                 dst = f"{base}.{i + 1}{ext}"
                 if osp.exists(src):
-                    try:
+                    with contextlib.suppress(OSError):
                         os.replace(src, dst)
-                    except OSError:
-                        pass
 
         if osp.exists(base):
             try:
@@ -478,24 +471,16 @@ class Logger:
 
     def close(self) -> None:
         for h in list(self._logger.handlers):
-            try:
+            with contextlib.suppress(Exception):
                 h.flush()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:
-                pass
             self._logger.removeHandler(h)
         for h in list(self._kv_logger.handlers):
-            try:
+            with contextlib.suppress(Exception):
                 h.flush()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:
-                pass
             self._kv_logger.removeHandler(h)
 
     # -- logging ------------------------------------------------------------
@@ -999,10 +984,8 @@ def configure(
             handlers_for_main.append(h)
 
     if Logger.CURRENT is not None and Logger.CURRENT is not Logger.DEFAULT:
-        try:
+        with contextlib.suppress(Exception):
             Logger.CURRENT.close()
-        except Exception:
-            pass
 
     # Disk-full / perm-denied writes degrade to stderr instead of crashing.
     logging.raiseExceptions = False
