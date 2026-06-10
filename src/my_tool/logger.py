@@ -44,8 +44,8 @@ _COLORS: dict[str, str] = {
     "CRITICAL": "\033[95m",
 }
 
-_LOGGER_NAME = "flux"
-_KV_LOGGER_NAME = "flux.kv"
+_LOGGER_NAME = "draven"
+_KV_LOGGER_NAME = "draven.kv"
 
 
 # ===========================================================================
@@ -208,7 +208,7 @@ class DailySizeRotatingFileHandler(logging.handlers.BaseRotatingHandler):
                 # Compression is best-effort; never crash the host service.
                 pass
 
-        threading.Thread(target=_run, daemon=True, name="flux-gzip").start()
+        threading.Thread(target=_run, daemon=True, name="draven-gzip").start()
 
     # -- retention ----------------------------------------------------------
 
@@ -411,9 +411,9 @@ class _KVAggregator:
 class Logger:
     """Holds the active configuration. Thin shell over stdlib ``logging``.
 
-    The on-the-wire delivery is done by ``logging.getLogger('flux')`` (for
+    The on-the-wire delivery is done by ``logging.getLogger('draven')`` (for
     ``info`` / ``warn`` / ``error`` / ``debug`` / ``exception``) and
-    ``logging.getLogger('flux.kv')`` (only for KV table dumps).
+    ``logging.getLogger('draven.kv')`` (only for KV table dumps).
     """
 
     DEFAULT: "Logger | None" = None
@@ -676,7 +676,7 @@ def print_config(file: Any = None) -> None:
     cfg = describe_config()
 
     print("=" * 70, file=out)
-    print("flux.logger configuration", file=out)
+    print("draven.logger configuration", file=out)
     print("=" * 70, file=out)
     print(f"  log root         : {cfg['dir']}", file=out)
     print(f"  global level     : {cfg['level']}", file=out)
@@ -911,6 +911,7 @@ def configure(
     comm: Any = None,
     log_suffix: str = "",
     json_output: bool = False,
+    console_level: int | None = None,
 ) -> None:
     """Set up (or re-set) the global logger.
 
@@ -943,6 +944,11 @@ def configure(
         comm: Optional ``mpi4py`` communicator for cross-rank KV aggregation.
         log_suffix: Suffix appended to every file basename.
         json_output: Use :class:`JsonFormatter` instead of human-readable.
+        console_level: If set, override the stdout handler's level only.
+            Useful when you want file handlers (info.log/debug.log/...) to
+            capture at their per-spec level while keeping stdout less chatty.
+            Defaults to None (stdout accepts everything that passes the
+            logger's global ``level``).
     """
     global _ATEXIT_REGISTERED
 
@@ -982,6 +988,15 @@ def configure(
             handlers_for_kv.append(h)
         else:
             handlers_for_main.append(h)
+
+    if console_level is not None:
+        for h in handlers_for_main:
+            if (
+                isinstance(h, logging.StreamHandler)
+                and not isinstance(h, logging.FileHandler)
+                and getattr(h, "stream", None) is sys.stdout
+            ):
+                h.setLevel(console_level)
 
     if Logger.CURRENT is not None and Logger.CURRENT is not Logger.DEFAULT:
         with contextlib.suppress(Exception):

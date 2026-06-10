@@ -5,6 +5,7 @@ from pathlib import Path
 
 from my_tool.logger import (
     DEBUG,
+    INFO,
     profile_kv,
 )
 from my_tool.logger import (
@@ -49,6 +50,14 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 1. Configure
     # ------------------------------------------------------------------
+    # There are TWO independent level knobs:
+    #   * level         -- global threshold; gates every handler (file + stdout).
+    #                      Records below this level never reach any output.
+    #   * console_level -- optional override applied ONLY to the stdout handler.
+    #                      Lets file handlers capture verbose detail (DEBUG)
+    #                      while stdout stays quiet (INFO+). Leave as None to
+    #                      let stdout follow `level`.
+    #
     # max_bytes is intentionally tiny (4 KiB) so the demo triggers a
     # size-rotation within a few writes; in production use the default
     # 100 MB or larger.
@@ -56,7 +65,8 @@ def main() -> None:
         dir_log=str(log_dir),
         root_dir=True,
         format_strs=["stdout", "info", "warn", "error", "debug"],
-        level=DEBUG,
+        level=DEBUG,  # files (debug.log/info.log/...) capture everything
+        console_level=INFO,  # stdout stays at INFO+ to avoid DEBUG spam
         max_bytes=4 * 1024,
         backup_count=3,
         gzip_old=False,
@@ -70,7 +80,7 @@ def main() -> None:
     # 2. Levels + exception()
     # ------------------------------------------------------------------
     section("Levels")
-    log_debug("a debug line (only visible because level=DEBUG)")
+    log_debug("a debug line (written to debug.log; not on stdout because console_level=INFO)")
     log_info("service started", "pid=", os.getpid())
     log_warn("disk usage > 80%")
     log_error("upstream timed out, retrying")
